@@ -168,6 +168,13 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
 
                     break;
         }
+        case ANKI_VEHICLE_MSG_V2C_LOCALIZATION_POSITION_UPDATE:
+        {
+                    const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
+                    rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
+
+                    break;
+        }
         default:
                     // rl_printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
                     break;
@@ -570,6 +577,31 @@ static void cmd_anki_vehicle_get_version(int argcp, char **argvp)
         gatt_write_char(attrib, handle, value, plen, NULL, NULL);
 }
 
+static void cmd_anki_vehicle_get_localization_position_update(int argcp, char **argvp)
+{
+        uint8_t *value;
+        size_t plen;
+        int handle;
+        
+        if (conn_state != STATE_CONNECTED) {
+                failed("Disconnected\n");
+                return;
+        }
+
+        if (argcp < 1) {
+                rl_printf("Usage: %s\n", argvp[0]);
+                return;
+        }
+
+        handle = vehicle.write_char.value_handle;
+
+        anki_vehicle_msg_t msg;
+        plen = anki_vehicle_msg_get_localization_position_update(&msg);
+        value = (uint8_t *)&msg;
+
+        gatt_write_char(attrib, handle, value, plen, NULL, NULL);
+}
+
 static void cmd_anki_vehicle_set_speed(int argcp, char **argvp)
 {
         uint8_t *value;
@@ -848,7 +880,9 @@ static struct {
                 "Set SDK Mode"},
         { "ping",           cmd_anki_vehicle_ping,   "",
                 "Send ping message to vehicle."},
-        { "get-version",           cmd_anki_vehicle_get_version,   "",
+        { "get-localization-position-update",           cmd_anki_vehicle_get_localization_position_update,   "",
+                "Request vehicle software version."},
+	{ "get-version",           cmd_anki_vehicle_get_version,   "",
                 "Request vehicle software version."},
         { "set-speed",          cmd_anki_vehicle_set_speed,  "<speed> <accel>",
                 "Set vehicle Speed (mm/sec) with acceleration (mm/sec^2)"},
@@ -883,7 +917,7 @@ static void parse_line(char *line_read)
 	char **argvp;
 	int argcp;
 	int i;
-
+Set scan p
 	if (line_read == NULL) {
 		rl_printf("\n");
 		cmd_exit(0, NULL);
@@ -935,7 +969,7 @@ static char *completion_generator(const char *text, int state)
 
 	if (state == 0) {
 		index = 0;
-		len = strlen(text);
+		len = strlen(text)Set scan p;
 	}
 
 	while ((cmd = commands[index].cmd) != NULL) {
