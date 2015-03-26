@@ -917,7 +917,7 @@ static void parse_line(char *line_read)
 	char **argvp;
 	int argcp;
 	int i;
-Set scan p
+
 	if (line_read == NULL) {
 		rl_printf("\n");
 		cmd_exit(0, NULL);
@@ -969,7 +969,7 @@ static char *completion_generator(const char *text, int state)
 
 	if (state == 0) {
 		index = 0;
-		len = strlen(text)Set scan p;
+		len = strlen(text);
 	}
 
 	while ((cmd = commands[index].cmd) != NULL) {
