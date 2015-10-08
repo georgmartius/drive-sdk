@@ -152,7 +152,7 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
         if (len > sizeof(anki_vehicle_msg_t)) {
                 error("Invalid vehicle response\n");
                 return;
-        } 
+        }
 
         const anki_vehicle_msg_t *msg = (const anki_vehicle_msg_t *)data;
         switch(msg->msg_id) {
@@ -193,7 +193,7 @@ static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data)
                 }
                 const uint8_t *data = &pdu[3];
                 const uint16_t datalen = len-3;
-                
+
                 handle_vehicle_msg_response(data, datalen);
 		return;
         }
@@ -379,7 +379,7 @@ static void discover_services(void)
                 failed("Disconnected\n");
                 return;
         }
-        
+
         bt_uuid_t uuid;
         if (bt_string_to_uuid(&uuid, ANKI_STR_SERVICE_UUID) < 0) {
                 error("Error attempting to discover service for UUID: %s\n", ANKI_STR_SERVICE_UUID);
@@ -557,7 +557,7 @@ static void cmd_anki_vehicle_get_version(int argcp, char **argvp)
         uint8_t *value;
         size_t plen;
         int handle;
-        
+
         if (conn_state != STATE_CONNECTED) {
                 failed("Disconnected\n");
                 return;
@@ -582,7 +582,7 @@ static void cmd_anki_vehicle_get_localization_position_update(int argcp, char **
         uint8_t *value;
         size_t plen;
         int handle;
-        
+
         if (conn_state != STATE_CONNECTED) {
                 failed("Disconnected\n");
                 return;
@@ -669,7 +669,7 @@ static void cmd_anki_vehicle_change_lane(int argcp, char **argvp)
 anki_vehicle_light_channel_t get_channel_by_name(const char *name)
 {
         uint8_t i;
-        uint8_t channel = channel_invalid; 
+        uint8_t channel = channel_invalid;
 
         if (name == NULL)
             return channel;
@@ -681,7 +681,7 @@ anki_vehicle_light_channel_t get_channel_by_name(const char *name)
                     channel = i;
                     break;
                 }
-        } 
+        }
 
         return channel;
 }
@@ -729,11 +729,11 @@ static void cmd_anki_vehicle_lights_pattern(int argcp, char **argvp)
         if (channel == channel_invalid) {
             rl_printf("Unrecognized channel: %s\n", argvp[1]);
             return;
-        } 
+        }
 
         uint8_t effect = get_effect_by_name(argvp[2]);
         if (effect == effect_invalid) {
-            rl_printf("Unrecognized channel: %s\n", argvp[2]); 
+            rl_printf("Unrecognized channel: %s\n", argvp[2]);
             return;
         }
 
@@ -795,9 +795,9 @@ static void cmd_anki_vehicle_engine_lights(int argcp, char **argvp)
 
         int handle = vehicle.write_char.value_handle;
         if (effect == EFFECT_STEADY) {
-            vehicle_set_rgb_lights(handle, effect, r, r, g, g, b, b, 0); 
+            vehicle_set_rgb_lights(handle, effect, r, r, g, g, b, b, 0);
         } else {
-            vehicle_set_rgb_lights(handle, effect, 0, r, 0, g, b, 0, cycles_per_min); 
+            vehicle_set_rgb_lights(handle, effect, 0, r, 0, g, b, 0, cycles_per_min);
         }
 }
 
@@ -881,7 +881,7 @@ static struct {
         { "ping",           cmd_anki_vehicle_ping,   "",
                 "Send ping message to vehicle."},
         { "get-localization-position-update",           cmd_anki_vehicle_get_localization_position_update,   "",
-                "Request vehicle software version."},
+                "Make vehicle to report its position."},
 	{ "get-version",           cmd_anki_vehicle_get_version,   "",
                 "Request vehicle software version."},
         { "set-speed",          cmd_anki_vehicle_set_speed,  "<speed> <accel>",
