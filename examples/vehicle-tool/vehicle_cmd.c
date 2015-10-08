@@ -423,6 +423,27 @@ static void cmd_anki_vehicle_read(int argcp, char **argvp)
 	gatt_read_char(attrib, handle, char_read_cb, attrib);
 }
 
+static void cmd_anki_vehicle_info(int argcp, char **argvp)
+{
+        uint8_t *value;
+        size_t plen;
+        int handle;
+
+        if (conn_state != STATE_CONNECTED) {
+                failed("Disconnected\n");
+                return;
+        }
+
+        if (argcp < 1) {
+                rl_printf("Usage: %s\n", argvp[0]);
+                return;
+        }
+
+        handle = vehicle.write_char.value_handle;
+
+	gatt_read_char(attrib, handle, char_read_cb, attrib);
+}
+
 static void char_write_req_cb(guint8 status, const guint8 *pdu, guint16 plen,
 							gpointer user_data)
 {
@@ -549,6 +570,31 @@ static void cmd_anki_vehicle_ping(int argcp, char **argvp)
         plen = anki_vehicle_msg_ping(&msg);
         value = (uint8_t *)&msg;
 
+        gatt_write_char(attrib, handle, value, plen, NULL, NULL);
+}
+
+static void cmd_anki_vehicle_uturn(int argcp, char **argvp)
+{
+        uint8_t *value;
+        size_t plen;
+        int handle;
+
+        if (conn_state != STATE_CONNECTED) {
+                failed("Disconnected\n");
+                return;
+        }
+
+        if (argcp < 1) {
+                rl_printf("Usage: %s\n", argvp[0]);
+                return;
+        }
+
+        handle = vehicle.write_char.value_handle;
+
+        anki_vehicle_msg_t msg;
+        plen = anki_vehicle_msg_turn_180(&msg);
+        value = (uint8_t *)&msg;
+        
         gatt_write_char(attrib, handle, value, plen, NULL, NULL);
 }
 
@@ -888,6 +934,8 @@ static struct {
                 "Set vehicle Speed (mm/sec) with acceleration (mm/sec^2)"},
         { "change-lane",          cmd_anki_vehicle_change_lane,  "<horizontal speed> <horizontal accel> <relative offset> (right(+), left(-))",
                 "Change lanes at speed (mm/sec), accel (mm/sec^2) in the specified direction (offset)"},
+        { "uturn",          cmd_anki_vehicle_uturn,  "",
+                "Perform U-turn"},
         { "set-lights-pattern",          cmd_anki_vehicle_lights_pattern,  "<channel> <effect> <start> <end> <cycles_per_min>",
                 "Set lights pattern for vehicle LEDs."},
         { "set-engine-lights",          cmd_anki_vehicle_engine_lights,  "<red> <green> <blue> <effect> <cycles_per_min>",
@@ -900,6 +948,8 @@ static struct {
 		"Write data to vehicle (No response)" },
 	{ "read-data",	cmd_anki_vehicle_read,	"",
 		"Read last message from vehicle" },
+	{ "info",	cmd_anki_vehicle_info,	"",
+		"Read all info from vehicle that I know how" },
 	{ NULL, NULL, NULL}
 };
 
