@@ -151,6 +151,14 @@ uint8_t anki_vehicle_msg_get_version(anki_vehicle_msg_t *msg)
     return ANKI_VEHICLE_MSG_TYPE_SIZE;
 }
 
+uint8_t anki_vehicle_msg_get_localization_position_update(anki_vehicle_msg_t *msg)
+{
+    assert(msg != NULL);
+    msg->size = ANKI_VEHICLE_MSG_BASE_SIZE;
+    msg->msg_id = ANKI_VEHICLE_MSG_V2C_LOCALIZATION_POSITION_UPDATE;
+    return ANKI_VEHICLE_MSG_TYPE_SIZE;
+}
+
 uint8_t anki_vehicle_msg_get_battery_level(anki_vehicle_msg_t *msg)
 {
     assert(msg != NULL);
