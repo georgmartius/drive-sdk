@@ -171,7 +171,8 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
         case ANKI_VEHICLE_MSG_V2C_LOCALIZATION_POSITION_UPDATE:
         {
                     const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
-                    rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
+                    rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\toffset %f\tclockwise %i\n", m->_reserved[0],m->_reserved[1], m->offset_from_road_center_mm, m->is_clockwise);
+
 
                     break;
         }
