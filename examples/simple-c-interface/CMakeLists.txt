@@ -15,7 +15,9 @@ set(ankiSimplified_SOURCES
 )
 
 add_library(ankidrivesimplified SHARED ${ankiSimplified_SOURCES})
-target_link_libraries(ankidrivesimplified ankidrive)
+target_link_libraries(ankidrivesimplified
+                      ankidrive
+                      bzle)
 
 add_executable(anki-simplified-test anki-simplified-test.c ${ankiSimplified_SOURCES})
 
