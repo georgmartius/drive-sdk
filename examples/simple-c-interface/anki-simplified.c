@@ -112,7 +112,7 @@ static enum state {
 #define failed(fmt, arg...)				\
   fprintf(stderr, "Command Failed: " fmt, ## arg)
 
-void set_state(enum state st){conn_state = st; }
+static void set_state(enum state st){conn_state = st; }
 
 static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
 {
@@ -236,25 +236,6 @@ static void discover_char_cb(guint8 status, GSList *characteristics, gpointer us
   }
 }
 
-static void char_read_cb(guint8 status, const guint8 *pdu, guint16 plen,
-			 gpointer user_data)
-{
-  if (status != 0) {
-    error("Characteristic value/descriptor read failed: %s\n",
-	  att_ecode2str(status));
-    return;
-  }
-
-  uint8_t value[plen];
-  ssize_t vlen = dec_read_resp(pdu, plen, value, sizeof(value));
-  if (vlen < 0) {
-    error("Protocol error\n");
-    return;
-  }
-
-  handle_vehicle_msg_response(value, vlen);
-}
-
 static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
 				gpointer user_data)
 {
@@ -281,7 +262,7 @@ static void discover_services_cb(guint8 status, GSList *ranges, gpointer user_da
 
   for (l = ranges; l; l = l->next) {
     struct att_range *range = l->data;
-    if(verbose) 
+    if(verbose)
       printf("Starting handle: 0x%04x Ending handle: 0x%04x\n", range->start, range->end);
   }
   gatt_discover_char(attrib, 0x1, 0xffff, NULL, discover_char_cb, NULL);
@@ -302,19 +283,6 @@ static void discover_services(void)
   }
 
   gatt_discover_primary(attrib, &uuid, discover_services_cb, NULL);
-}
-
-static int strtohandle(const char *src)
-{
-  char *e;
-  int dst;
-
-  errno = 0;
-  dst = strtoll(src, &e, 16);
-  if (errno != 0 || *e != '\0')
-    return -EINVAL;
-
-  return dst;
 }
 
 static void anki_s_intern_disconnect()
@@ -342,20 +310,6 @@ static int anki_s_intern_sdk_mode(int mode)
   return 1;
 }
 
-int anki_s_uturn()
-{
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
-  anki_vehicle_msg_t msg;
-  size_t plen = anki_vehicle_msg_turn_180(&msg);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
-  return 1;
-}
-
-
 static int anki_s_intern_get_localization_position_update()
 {
   if (conn_state != STATE_CONNECTED) {
@@ -369,6 +323,22 @@ static int anki_s_intern_get_localization_position_update()
   gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
   return 1;
 }
+
+//----------- EXPORTED FUNCTIONS START
+
+int anki_s_uturn()
+{
+  if (conn_state != STATE_CONNECTED) {
+    failed("Disconnected\n");
+    return 0;
+  }
+  int handle = vehicle.write_char.value_handle;
+  anki_vehicle_msg_t msg;
+  size_t plen = anki_vehicle_msg_turn_180(&msg);
+  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  return 1;
+}
+
 
 int anki_s_set_speed(int speed, int accel)
 {
