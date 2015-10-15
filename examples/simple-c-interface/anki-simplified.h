@@ -38,9 +38,9 @@ typedef void* AnkiHandler;
 AnkiHandler anki_s_init(const char *adapter, const char *car_id, int verbose);
 void anki_s_close(AnkiHandler handler);
 int anki_s_set_speed(AnkiHandler handler, int speed, int accel);
-int anki_s_u_turn(AnkiHandler handler);
+int anki_s_uturn(AnkiHandler handler);
 int anki_s_change_lane(AnkiHandler handler, int relative_offset, int h_speed, int h_accel);
 
-localization_t anki_s_get_localization();
+localization_t anki_s_get_localization(AnkiHandler handler);
 
 #endif
