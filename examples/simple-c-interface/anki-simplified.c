@@ -69,42 +69,30 @@
 
 #include <anki-simplified.h>
 
-static GIOChannel *iochannel = NULL;
-static GAttrib *attrib = NULL;
-static GMainLoop *event_loop;
-static GThread* g_thread;
-
-struct characteristic_data {
-  GAttrib *attrib;
-  uint16_t start;
-  uint16_t end;
-};
-
-static char *opt_src = NULL;
-static char *opt_dst = NULL;
-static char *opt_dst_type = NULL;
-static char *opt_sec_level = NULL;
-static bt_uuid_t *opt_uuid = NULL;
-static int opt_psm = 0;
-static int opt_mtu = 0;
-
 typedef struct anki_vehicle {
   struct gatt_char read_char;
   struct gatt_char write_char;
 } anki_vehicle_t;
 
-static anki_vehicle_t vehicle;
-static localization_t loc;
+typedef struct handler_t {
+  GIOChannel *iochannel;
+  GAttrib    *attrib;
+  GMainLoop  *event_loop;
+  GThread*    g_thread;
 
-static int verbose=0;
+  anki_vehicle_t vehicle;
+  localization_t loc;
 
-static void discover_services(void);
+  enum state {
+    STATE_DISCONNECTED,
+    STATE_CONNECTING,
+    STATE_CONNECTED
+  } conn_state;
 
-static enum state {
-  STATE_DISCONNECTED,
-  STATE_CONNECTING,
-  STATE_CONNECTED
-} conn_state;
+  int verbose;
+} handler;
+
+static void discover_services(handler* h);
 
 #define error(fmt, arg...)                      \
   fprintf(stderr, "Error: " fmt, ## arg)
@@ -112,9 +100,15 @@ static enum state {
 #define failed(fmt, arg...)				\
   fprintf(stderr, "Command Failed: " fmt, ## arg)
 
-static void set_state(enum state st){conn_state = st; }
+#define set_state(state) h->conn_state = st;
 
-static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
+static int check_connected(handler* h){
+  int status= (h && h->conn_state == STATE_CONNECTED);
+  if(!status){ failed("Disconnected\n"); }
+  return status;
+}
+
+static void handle_vehicle_msg_response(handler* h, const uint8_t *data, uint16_t len)
 {
   if (len > sizeof(anki_vehicle_msg_t)) {
     error("Invalid vehicle response\n");
@@ -128,10 +122,10 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
       const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
 
       // printf("LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
-      loc.update_time++;
-      loc.segm=m->_reserved[0];
-      loc.subsegm=m->_reserved[1];
-      loc.is_clockwise=m->is_clockwise;
+      h->loc.update_time++;
+      h->loc.segm=m->_reserved[0];
+      h->loc.subsegm=m->_reserved[1];
+      h->loc.is_clockwise=m->is_clockwise;
       break;
     }
   default:
@@ -142,64 +136,66 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
 
 static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data)
 {
+  handler* h = (handler*)user_data;
   uint16_t handle = att_get_u16(&pdu[1]);
 
   if (pdu[0] == ATT_OP_HANDLE_NOTIFY) {
     uint16_t handle = att_get_u16(&pdu[1]);
-    if (handle != vehicle.read_char.value_handle) {
+    if (handle != h->vehicle.read_char.value_handle) {
       error("Invalid vehicle read handle: 0x%04x\n", handle);
       return;
     }
     const uint8_t *data = &pdu[3];
     const uint16_t datalen = len-3;
 
-    handle_vehicle_msg_response(data, datalen);
+    handle_vehicle_msg_response(h, data, datalen);
     return;
   }
 }
 
 static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 {
+  handler* h = (handler*)user_data;
   if (err) {
-    set_state(STATE_DISCONNECTED);
+    h->conn_state=STATE_DISCONNECTED;
     error("%s\n", err->message);
     return;
   }
 
-  attrib = g_attrib_new(iochannel);
-  g_attrib_register(attrib, ATT_OP_HANDLE_NOTIFY, GATTRIB_ALL_HANDLES,
-		    events_handler, attrib, NULL);
-  g_attrib_register(attrib, ATT_OP_HANDLE_IND, GATTRIB_ALL_HANDLES,
-		    events_handler, attrib, NULL);
-  set_state(STATE_CONNECTED);
-  if(verbose) printf("Connection successful\n");
+  h->attrib = g_attrib_new(h->iochannel);
+  g_attrib_register(h->attrib, ATT_OP_HANDLE_NOTIFY, GATTRIB_ALL_HANDLES,
+                    events_handler, h, NULL);
+  g_attrib_register(h->attrib, ATT_OP_HANDLE_IND, GATTRIB_ALL_HANDLES,
+                    events_handler, h, NULL);
+  h->conn_state=STATE_CONNECTED;
+  if(h->verbose) printf("Connection successful\n");
 
-  discover_services();
+  discover_services(h);
 }
 
-static void disconnect_io()
+static void disconnect_io(handler* h)
 {
-  if (conn_state == STATE_DISCONNECTED)
+  if (h->conn_state == STATE_DISCONNECTED)
     return;
 
-  g_attrib_unref(attrib);
-  attrib = NULL;
-  opt_mtu = 0;
+  g_attrib_unref(h->attrib);
+  h->attrib = NULL;
 
-  g_io_channel_shutdown(iochannel, FALSE, NULL);
-  g_io_channel_unref(iochannel);
-  iochannel = NULL;
+  g_io_channel_shutdown(h->iochannel, FALSE, NULL);
+  g_io_channel_unref(h->iochannel);
+  h->iochannel = NULL;
 
-  set_state(STATE_DISCONNECTED);
+  h->conn_state=STATE_DISCONNECTED;
 }
 
 static void discover_char_cb(guint8 status, GSList *characteristics, gpointer user_data)
 {
   GSList *l;
+  handler* h = (handler*)user_data;
 
   if (status) {
     error("Discover all characteristics failed: %s\n",
-	  att_ecode2str(status));
+          att_ecode2str(status));
     return;
   }
 
@@ -207,8 +203,8 @@ static void discover_char_cb(guint8 status, GSList *characteristics, gpointer us
     struct gatt_char *chars = l->data;
 
     if (strncasecmp(chars->uuid, ANKI_STR_CHR_READ_UUID, strlen(ANKI_STR_CHR_READ_UUID)) == 0) {
-      memmove(&(vehicle.read_char), chars, sizeof(struct gatt_char));
-      if(verbose) { printf("Anki Read Characteristic: %s ", chars->uuid);
+      memmove(&(h->vehicle.read_char), chars, sizeof(struct gatt_char));
+      if(h->verbose) { printf("Anki Read Characteristic: %s ", chars->uuid);
 	printf("[handle: 0x%04x, char properties: 0x%02x, char value "
 	       "handle: 0x%04x]\n", chars->handle,
 	       chars->properties, chars->value_handle);
@@ -216,8 +212,8 @@ static void discover_char_cb(guint8 status, GSList *characteristics, gpointer us
     }
 
     if (strncasecmp(chars->uuid, ANKI_STR_CHR_WRITE_UUID, strlen(ANKI_STR_CHR_WRITE_UUID)) == 0) {
-      memmove(&(vehicle.write_char), chars, sizeof(struct gatt_char));
-      if(verbose) { printf("Anki Write Characteristic: %s ", chars->uuid);
+      memmove(&(h->vehicle.write_char), chars, sizeof(struct gatt_char));
+      if(h->verbose) { printf("Anki Write Characteristic: %s ", chars->uuid);
 	printf("[handle: 0x%04x, char properties: 0x%02x, char value "
 	       "handle: 0x%04x]\n", chars->handle,
 	       chars->properties, chars->value_handle);
@@ -225,21 +221,21 @@ static void discover_char_cb(guint8 status, GSList *characteristics, gpointer us
     }
   }
 
-  if (vehicle.read_char.handle > 0 && vehicle.write_char.handle > 0) {
+  if (h->vehicle.read_char.handle > 0 && h->vehicle.write_char.handle > 0) {
     // register for notifications when the vehicle sends data.
     // We do this by setting the notification bit on the
     // client configuration characteristic:
     // see:
     // https://developer.bluetooth.org/gatt/descriptors/Pages/DescriptorViewer.aspx?u=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
     uint8_t notify_cmd[] = { 0x01, 0x00 };
-    gatt_write_cmd(attrib, vehicle.write_char.properties, notify_cmd,  2, NULL, NULL);
+    gatt_write_cmd(h->attrib, h->vehicle.write_char.properties, notify_cmd,  2, NULL, NULL);
   }
 }
 
 static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
-				gpointer user_data)
+                                gpointer user_data)
 {
-  disconnect_io();
+  disconnect_io((handler*)user_data);
   return FALSE;
 }
 
@@ -248,10 +244,11 @@ static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
 static void discover_services_cb(guint8 status, GSList *ranges, gpointer user_data)
 {
   GSList *l;
+  handler* h = (handler*)user_data;
 
   if (status) {
     error("Discover primary services by UUID failed: %s\n",
-	  att_ecode2str(status));
+          att_ecode2str(status));
     return;
   }
 
@@ -262,19 +259,16 @@ static void discover_services_cb(guint8 status, GSList *ranges, gpointer user_da
 
   for (l = ranges; l; l = l->next) {
     struct att_range *range = l->data;
-    if(verbose)
+    if(h->verbose)
       printf("Starting handle: 0x%04x Ending handle: 0x%04x\n", range->start, range->end);
   }
-  gatt_discover_char(attrib, 0x1, 0xffff, NULL, discover_char_cb, NULL);
+  gatt_discover_char(h->attrib, 0x1, 0xffff, NULL, discover_char_cb, h);
 }
 
 
-static void discover_services(void)
+static void discover_services(handler* h)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return;
-  }
+  if (!check_connected(h)) return;
 
   bt_uuid_t uuid;
   if (bt_string_to_uuid(&uuid, ANKI_STR_SERVICE_UUID) < 0) {
@@ -282,166 +276,156 @@ static void discover_services(void)
     return;
   }
 
-  gatt_discover_primary(attrib, &uuid, discover_services_cb, NULL);
+  gatt_discover_primary(h->attrib, &uuid, discover_services_cb, h);
 }
 
-static void anki_s_intern_disconnect()
+static void disconnect(handler* h)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return;
-  }
-  int handle = vehicle.write_char.value_handle;
+  if (!check_connected(h)) return;
+
+  int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_disconnect(&msg);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
 }
 
-static int anki_s_intern_sdk_mode(int mode)
+static int sdk_mode(handler* h,int mode)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
+  if (!check_connected(h))  return 0;
+
+  int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_set_sdk_mode(&msg, mode, ANKI_VEHICLE_SDK_OPTION_OVERRIDE_LOCALIZATION);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
   return 1;
 }
 
-static int anki_s_intern_get_localization_position_update()
+static int get_localization_position_update(handler* h)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
+  if (!check_connected(h))  return 0;
+  int handle = h->vehicle.write_char.value_handle;
 
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_get_localization_position_update(&msg);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
   return 1;
+}
+
+
+void *event_loop_thread(gpointer data) {
+  handler* h = (handler*)data;
+  h->event_loop = g_main_loop_new(NULL, FALSE);
+  // put into extra thread
+  g_main_loop_run(h->event_loop);
 }
 
 //----------- EXPORTED FUNCTIONS START
 
-int anki_s_uturn()
+int anki_s_uturn(AnkiHandler ankihandler)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
+  handler* h = (handler*)ankihandler;
+
+  if (!check_connected(h))  return 0;
+
+  int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_turn_180(&msg);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
   return 1;
 }
 
 
-int anki_s_set_speed(int speed, int accel)
+int anki_s_set_speed(AnkiHandler ankihandler, int speed, int accel)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
+  handler* h = (handler*)ankihandler;
+  if (!check_connected(h))  return 0;
 
-  if(verbose) printf("setting speed to %d (accel = %d)\n", speed, accel);
+  if(h->verbose) printf("setting speed to %d (accel = %d)\n", speed, accel);
 
+  int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_set_speed(&msg, speed, accel);
-  gatt_write_char(attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
   return 1;
 }
 
-int anki_s_change_lane(int relative_offset, int h_speed, int h_accel)
+int anki_s_change_lane(AnkiHandler ankihandler, int relative_offset, int h_speed, int h_accel)
 {
-  if (conn_state != STATE_CONNECTED) {
-    failed("Disconnected\n");
-    return 0;
-  }
-  int handle = vehicle.write_char.value_handle;
+  handler* h = (handler*)ankihandler;
+  if (!check_connected(h))  return 0;
+
+  int handle = h->vehicle.write_char.value_handle;
   float offset = relative_offset;
 
-  if(verbose) printf("changing lane at %d (accel = %d | offset = %1.2f)\n", h_speed, h_accel, offset);
+  if(h->verbose) printf("changing lane at %d (accel = %d | offset = %1.2f)\n", h_speed, h_accel, offset);
 
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_set_offset_from_road_center(&msg, 0.0);
-  gatt_write_char(attrib, handle, (uint8_t*)&msg, plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t*)&msg, plen, NULL, NULL);
 
   anki_vehicle_msg_t lane_msg;
   size_t lane_plen = anki_vehicle_msg_change_lane(&lane_msg, h_speed, h_accel, offset);
-  gatt_write_char(attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
+  gatt_write_char(h->attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
   return 1;
 }
 
-localization_t anki_s_get_localization(){
-  return loc;
+localization_t anki_s_get_localization(AnkiHandler ankihandler){
+  handler* h = (handler*)ankihandler;
+  return h->loc;
 }
 
-void *event_loop_thread(gpointer data) {
-  event_loop = g_main_loop_new(NULL, FALSE);
-  // put into extra thread
-  g_main_loop_run(event_loop);
-}
+AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
+  handler* h = (handler*)malloc(sizeof(handler));
+  h->iochannel        = NULL;
+  h->attrib           = NULL;
+  h->verbose          = _verbose;
+  h->loc.segm         = 0;
+  h->loc.subsegm      = 0;
+  h->loc.is_clockwise = 0;
+  h->loc.update_time  = 0;
+  h->conn_state       = STATE_DISCONNECTED;
 
-int anki_s_init(const char *src, const char *dst, int _verbose){
-  if (conn_state != STATE_DISCONNECTED)
-    return 0;
-
-  verbose = _verbose;
   if (dst == NULL) {
     error("Remote Bluetooth address required\n");
     return 0;
   }
 
-
-  loc.segm=0;
-  loc.subsegm=0;
-  loc.is_clockwise=0;
-  loc.update_time=0;
-
-  opt_src = g_strdup(src);
-  opt_dst = g_strdup(dst);
-  opt_dst_type = g_strdup("random");
-  opt_sec_level = g_strdup("low");
-
-  g_thread = g_thread_new("eventloopthread",(GThreadFunc)event_loop_thread,NULL);
+  h->g_thread = g_thread_new("eventloopthread",(GThreadFunc)event_loop_thread, h);
 
   GError *gerr = NULL;
+  int psm      = 0;
+  int mtu      = 0;
 
-  if(verbose) printf("Attempting to connect to %s\n", opt_dst);
-  set_state(STATE_CONNECTING);
-  iochannel = gatt_connect(opt_src, opt_dst, opt_dst_type, opt_sec_level,
-                           opt_psm, opt_mtu, connect_cb, &gerr);
-  if (iochannel == NULL) {
-    set_state(STATE_DISCONNECTED);
+
+  if(h->verbose) printf("Attempting to connect to %s\n", dst);
+
+  h->iochannel = gatt_connect(src, dst, "random", "low", psm, mtu, connect_cb, &gerr, h);
+  if (h->iochannel == NULL) {
+    h->conn_state=STATE_DISCONNECTED;
     error("%s\n", gerr->message);
     g_error_free(gerr);
     return 0;
   } else
-    g_io_add_watch(iochannel, G_IO_HUP, channel_watcher, NULL);
+    g_io_add_watch(h->iochannel, G_IO_HUP, channel_watcher, h);
 
   g_usleep(G_USEC_PER_SEC);
   // set sdk mode
-  anki_s_intern_sdk_mode(1);
+  sdk_mode(h,1);
 
   // enable localization update
-  anki_s_intern_get_localization_position_update();
+  get_localization_position_update(h);
 
-  return 1;
+  return h;
 }
 
-void anki_s_close(){
-  anki_s_intern_disconnect();
+void anki_s_close(AnkiHandler ankihandler){
+  handler* h = (handler*)ankihandler;
+  if (!h) return;
+  disconnect(h);
   g_usleep(50000);
-  g_main_loop_quit(event_loop);
-  g_thread_join(g_thread);
-  g_thread_unref(g_thread);
-  g_main_loop_unref(event_loop);
-  g_free(opt_src);
-  g_free(opt_dst_type);
-  g_free(opt_sec_level);
+  g_main_loop_quit(h->event_loop);
+  g_thread_join(h->g_thread);
+  g_thread_unref(h->g_thread);
+  g_main_loop_unref(h->event_loop);
+  free(h);
 }

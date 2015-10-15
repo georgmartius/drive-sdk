@@ -30,11 +30,16 @@ typedef struct localization {
   int update_time ;
 } localization_t;
 
-int anki_s_init(const char *adapter, const char *car_id, int verbose);
-void anki_s_close();
-int anki_s_set_speed(int speed, int accel);
-int anki_s_u_turn();
-int anki_s_change_lane(int relative_offset, int h_speed, int h_accel);
+typedef void* AnkiHandler;
+
+/** initializes the interface to the car via bluetooth and returns a handler (0 on failure).
+    adapter is typicalle "hci0" and the car_id can be determined by the vehicle_scan utility
+ */
+AnkiHandler anki_s_init(const char *adapter, const char *car_id, int verbose);
+void anki_s_close(AnkiHandler handler);
+int anki_s_set_speed(AnkiHandler handler, int speed, int accel);
+int anki_s_u_turn(AnkiHandler handler);
+int anki_s_change_lane(AnkiHandler handler, int relative_offset, int h_speed, int h_accel);
 
 localization_t anki_s_get_localization();
 

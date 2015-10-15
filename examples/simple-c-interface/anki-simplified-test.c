@@ -22,9 +22,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-print_loc(){
+print_loc(AnkiHandler h){
   localization_t loc;
-  loc=anki_s_get_localization();
+  loc=anki_s_get_localization(h);
   printf("Location: segm: %03x subsegm: %03x clock-wise: %i last-update: %i\n",
 	 loc.segm, loc.subsegm, loc.is_clockwise, loc.update_time);
 }
@@ -38,15 +38,15 @@ int main(int argc, char *argv[])
   const char* adapter = argv[1];
   const char* car_id  = argv[2];
   int i;
-  anki_s_init(adapter, car_id, argc>3);
+  AnkiHandler h = anki_s_init(adapter, car_id, argc>3);
   sleep(2);
-  anki_s_set_speed(1000,20000);
-  for(i=0; i<10; i++){ sleep(1);  print_loc();  }
-  anki_s_set_speed(500,20000);
-  for(i=0; i<10; i++){ sleep(1);  print_loc();  }
-  anki_s_change_lane(-50,100,1000);
-  for(i=0; i<10; i++){ sleep(1);  print_loc();  }
-  anki_s_set_speed(0,20000);
+  anki_s_set_speed(h,1000,20000);
+  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  anki_s_set_speed(h,500,20000);
+  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  anki_s_change_lane(h,-50,100,1000);
+  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  anki_s_set_speed(h,0,20000);
   sleep(1);
-  anki_s_close();
+  anki_s_close(h);
 }

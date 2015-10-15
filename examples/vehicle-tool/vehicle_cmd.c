@@ -335,7 +335,7 @@ static void cmd_connect(int argcp, char **argvp)
 	rl_printf("Attempting to connect to %s\n", opt_dst);
 	set_state(STATE_CONNECTING);
 	iochannel = gatt_connect(opt_src, opt_dst, opt_dst_type, opt_sec_level,
-					opt_psm, opt_mtu, connect_cb, &gerr);
+                                opt_psm, opt_mtu, connect_cb, &gerr, NULL);
 	if (iochannel == NULL) {
 		set_state(STATE_DISCONNECTED);
 		error("%s\n", gerr->message);
