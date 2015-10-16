@@ -74,7 +74,7 @@ typedef struct anki_vehicle {
   struct gatt_char write_char;
 } anki_vehicle_t;
 
-typedef struct handler_t {
+typedef struct handle {
   GIOChannel *iochannel;
   GAttrib    *attrib;
   GMainLoop  *event_loop;
@@ -90,9 +90,9 @@ typedef struct handler_t {
   } conn_state;
 
   int verbose;
-} handler;
+} handle_t;
 
-static void discover_services(handler* h);
+static void discover_services(handle_t* h);
 
 #define error(fmt, arg...)                      \
   fprintf(stderr, "Error: " fmt, ## arg)
@@ -102,13 +102,13 @@ static void discover_services(handler* h);
 
 #define set_state(state) h->conn_state = st;
 
-static int check_connected(handler* h){
+static int check_connected(handle_t* h){
   int status= (h && h->conn_state == STATE_CONNECTED);
   if(!status){ failed("Disconnected\n"); }
   return status;
 }
 
-static void handle_vehicle_msg_response(handler* h, const uint8_t *data, uint16_t len)
+static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16_t len)
 {
   if (len > sizeof(anki_vehicle_msg_t)) {
     error("Invalid vehicle response\n");
@@ -136,7 +136,7 @@ static void handle_vehicle_msg_response(handler* h, const uint8_t *data, uint16_
 
 static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data)
 {
-  handler* h = (handler*)user_data;
+  handle_t* h = (handle_t*)user_data;
   uint16_t handle = att_get_u16(&pdu[1]);
 
   if (pdu[0] == ATT_OP_HANDLE_NOTIFY) {
@@ -155,7 +155,7 @@ static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data)
 
 static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 {
-  handler* h = (handler*)user_data;
+  handle_t* h = (handle_t*)user_data;
   if (err) {
     h->conn_state=STATE_DISCONNECTED;
     error("%s\n", err->message);
@@ -173,7 +173,7 @@ static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
   discover_services(h);
 }
 
-static void disconnect_io(handler* h)
+static void disconnect_io(handle_t* h)
 {
   if (h->conn_state == STATE_DISCONNECTED)
     return;
@@ -191,7 +191,7 @@ static void disconnect_io(handler* h)
 static void discover_char_cb(guint8 status, GSList *characteristics, gpointer user_data)
 {
   GSList *l;
-  handler* h = (handler*)user_data;
+  handle_t* h = (handle_t*)user_data;
 
   if (status) {
     error("Discover all characteristics failed: %s\n",
@@ -235,7 +235,7 @@ static void discover_char_cb(guint8 status, GSList *characteristics, gpointer us
 static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
                                 gpointer user_data)
 {
-  disconnect_io((handler*)user_data);
+  disconnect_io((handle_t*)user_data);
   return FALSE;
 }
 
@@ -244,7 +244,7 @@ static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
 static void discover_services_cb(guint8 status, GSList *ranges, gpointer user_data)
 {
   GSList *l;
-  handler* h = (handler*)user_data;
+  handle_t* h = (handle_t*)user_data;
 
   if (status) {
     error("Discover primary services by UUID failed: %s\n",
@@ -266,7 +266,7 @@ static void discover_services_cb(guint8 status, GSList *ranges, gpointer user_da
 }
 
 
-static void discover_services(handler* h)
+static void discover_services(handle_t* h)
 {
   if (!check_connected(h)) return;
 
@@ -279,7 +279,7 @@ static void discover_services(handler* h)
   gatt_discover_primary(h->attrib, &uuid, discover_services_cb, h);
 }
 
-static void disconnect(handler* h)
+static void disconnect(handle_t* h)
 {
   if (!check_connected(h)) return;
 
@@ -289,7 +289,7 @@ static void disconnect(handler* h)
   gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
 }
 
-static int sdk_mode(handler* h,int mode)
+static int sdk_mode(handle_t* h,int mode)
 {
   if (!check_connected(h))  return 0;
 
@@ -300,7 +300,7 @@ static int sdk_mode(handler* h,int mode)
   return 1;
 }
 
-static int get_localization_position_update(handler* h)
+static int get_localization_position_update(handle_t* h)
 {
   if (!check_connected(h))  return 0;
   int handle = h->vehicle.write_char.value_handle;
@@ -313,7 +313,7 @@ static int get_localization_position_update(handler* h)
 
 
 void *event_loop_thread(gpointer data) {
-  handler* h = (handler*)data;
+  handle_t* h = (handle_t*)data;
   h->event_loop = g_main_loop_new(NULL, FALSE);
   // put into extra thread
   g_main_loop_run(h->event_loop);
@@ -321,24 +321,24 @@ void *event_loop_thread(gpointer data) {
 
 //----------- EXPORTED FUNCTIONS START
 
-int anki_s_uturn(AnkiHandler ankihandler)
+int anki_s_uturn(AnkiHandle ankihandle)
 {
-  handler* h = (handler*)ankihandler;
+  handle_t* h = (handle_t*)ankihandle;
 
-  if (!check_connected(h))  return 0;
+  if (!check_connected(h))  return 1;
 
   int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_turn_180(&msg);
   gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
-  return 1;
+  return 0;
 }
 
 
-int anki_s_set_speed(AnkiHandler ankihandler, int speed, int accel)
+int anki_s_set_speed(AnkiHandle ankihandle, int speed, int accel)
 {
-  handler* h = (handler*)ankihandler;
-  if (!check_connected(h))  return 0;
+  handle_t* h = (handle_t*)ankihandle;
+  if (!check_connected(h))  return 1;
 
   if(h->verbose) printf("setting speed to %d (accel = %d)\n", speed, accel);
 
@@ -346,13 +346,13 @@ int anki_s_set_speed(AnkiHandler ankihandler, int speed, int accel)
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_set_speed(&msg, speed, accel);
   gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
-  return 1;
+  return 0;
 }
 
-int anki_s_change_lane(AnkiHandler ankihandler, int relative_offset, int h_speed, int h_accel)
+int anki_s_change_lane(AnkiHandle ankihandle, int relative_offset, int h_speed, int h_accel)
 {
-  handler* h = (handler*)ankihandler;
-  if (!check_connected(h))  return 0;
+  handle_t* h = (handle_t*)ankihandle;
+  if (!check_connected(h))  return 1;
 
   int handle = h->vehicle.write_char.value_handle;
   float offset = relative_offset;
@@ -366,16 +366,22 @@ int anki_s_change_lane(AnkiHandler ankihandler, int relative_offset, int h_speed
   anki_vehicle_msg_t lane_msg;
   size_t lane_plen = anki_vehicle_msg_change_lane(&lane_msg, h_speed, h_accel, offset);
   gatt_write_char(h->attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
-  return 1;
+  return 0;
 }
 
-localization_t anki_s_get_localization(AnkiHandler ankihandler){
-  handler* h = (handler*)ankihandler;
+localization_t anki_s_get_localization(AnkiHandle ankihandle){
+  handle_t* h = (handle_t*)ankihandle;
+  if (!check_connected(h)) {
+    localization_t l;
+    l.segm=-1;
+    l.update_time=-1;
+    return l;
+  }
   return h->loc;
 }
 
-AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
-  handler* h = (handler*)malloc(sizeof(handler));
+AnkiHandle anki_s_init(const char *src, const char *dst, int _verbose){
+  handle_t* h = (handle_t*)malloc(sizeof(handle_t));
   h->iochannel        = NULL;
   h->attrib           = NULL;
   h->verbose          = _verbose;
@@ -387,7 +393,7 @@ AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
 
   if (dst == NULL) {
     error("Remote Bluetooth address required\n");
-    return 0;
+    return NULL;
   }
 
   h->g_thread = g_thread_new("eventloopthread",(GThreadFunc)event_loop_thread, h);
@@ -396,7 +402,6 @@ AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
   int psm      = 0;
   int mtu      = 0;
 
-
   if(h->verbose) printf("Attempting to connect to %s\n", dst);
 
   h->iochannel = gatt_connect(src, dst, "random", "low", psm, mtu, connect_cb, &gerr, h);
@@ -404,7 +409,7 @@ AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
     h->conn_state=STATE_DISCONNECTED;
     error("%s\n", gerr->message);
     g_error_free(gerr);
-    return 0;
+    return NULL;
   } else
     g_io_add_watch(h->iochannel, G_IO_HUP, channel_watcher, h);
 
@@ -418,8 +423,8 @@ AnkiHandler anki_s_init(const char *src, const char *dst, int _verbose){
   return h;
 }
 
-void anki_s_close(AnkiHandler ankihandler){
-  handler* h = (handler*)ankihandler;
+void anki_s_close(AnkiHandle ankihandle){
+  handle_t* h = (handle_t*)ankihandle;
   if (!h) return;
   disconnect(h);
   g_usleep(50000);
