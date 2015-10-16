@@ -312,7 +312,7 @@ static int get_localization_position_update(handle_t* h)
 }
 
 
-void *event_loop_thread(gpointer data) {
+static void *event_loop_thread(gpointer data) {
   handle_t* h = (handle_t*)data;
   h->event_loop = g_main_loop_new(NULL, FALSE);
   // put into extra thread

@@ -40,15 +40,6 @@ typedef void* AnkiHandle;
     @param car_id MAC-address of car, can be determined with the vehicle_scan utility
     @return handle  or 0 (NULL) on failure.
  */
-<<<<<<< HEAD
-AnkiHandler anki_s_init(const char *adapter, const char *car_id, int verbose);
-void anki_s_close(AnkiHandler handler);
-int anki_s_set_speed(AnkiHandler handler, int speed, int accel);
-int anki_s_uturn(AnkiHandler handler);
-int anki_s_change_lane(AnkiHandler handler, int relative_offset, int h_speed, int h_accel);
-
-localization_t anki_s_get_localization(AnkiHandler handler);
-=======
 AnkiHandle anki_s_init(const char *adapter, const char *car_id, int verbose);
 /// closes the connection
 void anki_s_close(AnkiHandle handle);
@@ -61,7 +52,7 @@ int anki_s_set_speed(AnkiHandle handle, int speed, int accel);
 /** set let the car do a u-turn (direction of turning seems to be is autonomously decided)
     @return 0 for okay, 1 for failure
  */
-int anki_s_u_turn(AnkiHandle handle);
+int anki_s_uturn(AnkiHandle handle);
 /** set let the car change a lane
     @param relative_offset value in mm relative to current lane (polarity ?)
     @param h_speed value in mm/s. (default 100)
@@ -73,7 +64,6 @@ int anki_s_change_lane(AnkiHandle handle, int relative_offset, int h_speed, int 
 /** returns the last self-localization of the car
     @return locatization struct
  */
-localization_t anki_s_get_localization();
->>>>>>> 2fc764879b5fb42a0bbd2592006524b37dbaa4c8
+localization_t anki_s_get_localization(AnkiHandle handle);
 
 #endif
