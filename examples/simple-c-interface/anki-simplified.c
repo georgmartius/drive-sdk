@@ -123,8 +123,8 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
 
       // printf("LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
       h->loc.update_time++;
-      h->loc.segm=m->_reserved[0];
-      h->loc.subsegm=m->_reserved[1];
+      h->loc.segm=m->_reserved[1];
+      h->loc.subsegm=m->_reserved[0];
       h->loc.is_clockwise=m->is_clockwise;
       break;
     }
