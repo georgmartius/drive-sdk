@@ -61,6 +61,9 @@ int anki_s_uturn(AnkiHandle handle);
  */
 int anki_s_change_lane(AnkiHandle handle, int relative_offset, int h_speed, int h_accel);
 
+/** returns 1 if connected and 0 if not*/
+int anki_s_is_connected(AnkiHandle handle);
+
 /** returns the last self-localization of the car
     @return locatization struct
  */

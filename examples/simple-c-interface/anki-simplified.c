@@ -321,6 +321,11 @@ static void *event_loop_thread(gpointer data) {
 
 //----------- EXPORTED FUNCTIONS START
 
+int anki_s_is_connected(AnkiHandle ankihandle){
+  handle_t* h = (handle_t*)ankihandle;
+  return (h && h->conn_state == STATE_CONNECTED);
+}
+
 int anki_s_uturn(AnkiHandle ankihandle)
 {
   handle_t* h = (handle_t*)ankihandle;
