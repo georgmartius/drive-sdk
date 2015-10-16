@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-print_loc(AnkiHandler h){
+print_loc(AnkiHandle h){
   localization_t loc;
   loc=anki_s_get_localization(h);
   printf("Location: segm: %03x subsegm: %03x clock-wise: %i last-update: %i\n",
@@ -38,9 +38,9 @@ int main(int argc, char *argv[])
   const char* adapter = argv[1];
   const char* car_id  = argv[2];
   int i;
-  AnkiHandler h = anki_s_init(adapter, car_id, argc>3);
+  AnkiHandle h = anki_s_init(adapter, car_id, argc>3);
   sleep(2);
-  anki_s_set_speed(h,1000,20000);
+  if(anki_s_set_speed(h,1000,20000)!=0) return 1;
   for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
   anki_s_set_speed(h,500,20000);
   for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
@@ -49,4 +49,6 @@ int main(int argc, char *argv[])
   anki_s_set_speed(h,0,20000);
   sleep(1);
   anki_s_close(h);
+
+  return 0;
 }
