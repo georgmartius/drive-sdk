@@ -49,8 +49,8 @@ int main(int argc, char *argv[])
   anki_s_set_speed(h,0,20000);
   sleep(1);
   anki_s_close(h);
-  sleep(2);  
-  AnkiHandler h2 = anki_s_init(adapter, car_id, argc>3);
+  sleep(2);
+  AnkiHandle h2 = anki_s_init(adapter, car_id, argc>3);
   sleep(1);
   if(anki_s_set_speed(h2,1000,20000)!=0) return 1;
   sleep(1);
