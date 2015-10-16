@@ -175,7 +175,7 @@ static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 
 static void disconnect_io(handle_t* h)
 {
-  if (h->conn_state == STATE_DISCONNECTED)
+  if (!h || h->conn_state == STATE_DISCONNECTED)
     return;
 
   g_attrib_unref(h->attrib);
@@ -432,10 +432,11 @@ void anki_s_close(AnkiHandle ankihandle){
   handle_t* h = (handle_t*)ankihandle;
   if (!h) return;
   disconnect(h);
-  g_usleep(50000);
+  g_usleep(1000000);
   g_main_loop_quit(h->event_loop);
+  g_usleep(50000);
   g_thread_join(h->g_thread);
-  g_thread_unref(h->g_thread);
   g_main_loop_unref(h->event_loop);
   free(h);
 }
+  
