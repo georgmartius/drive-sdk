@@ -369,6 +369,20 @@ int anki_s_change_lane(AnkiHandle ankihandle, int relative_offset, int h_speed, 
   return 0;
 }
 
+int anki_s_cancel_lane_change(AnkiHandle ankihandle)
+{
+  handle_t* h = (handle_t*)ankihandle;
+  if (!check_connected(h))  return 1;
+
+  int handle = h->vehicle.write_char.value_handle;
+  if(h->verbose) printf("cancel changing lane\n");
+
+  anki_vehicle_msg_t clane_msg;
+  size_t clane_plen = anki_vehicle_msg_cancel_lane_change(&clane_msg);
+  gatt_write_char(h->attrib, handle, (uint8_t*)&clane_msg, clane_plen, NULL, NULL);
+  return 0;
+}
+
 localization_t anki_s_get_localization(AnkiHandle ankihandle){
   handle_t* h = (handle_t*)ankihandle;
   if (!check_connected(h)) {

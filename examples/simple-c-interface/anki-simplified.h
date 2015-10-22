@@ -61,6 +61,12 @@ int anki_s_u_turn(AnkiHandle handle);
  */
 int anki_s_change_lane(AnkiHandle handle, int relative_offset, int h_speed, int h_accel);
 
+/** cancels last change command
+    @return 0 for okay, 1 for failure
+ */
+int anki_s_cancel_lane_change(AnkiHandle handle);
+
+
 /** returns the last self-localization of the car
     @return locatization struct
  */
