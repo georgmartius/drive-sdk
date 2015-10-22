@@ -123,8 +123,8 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
 
       // printf("LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
       h->loc.update_time++;
-      h->loc.segm=m->_reserved[0];
-      h->loc.subsegm=m->_reserved[1];
+      h->loc.segm=m->_reserved[1];
+      h->loc.subsegm=m->_reserved[0];
       h->loc.is_clockwise=m->is_clockwise;
       break;
     }
@@ -175,7 +175,7 @@ static void connect_cb(GIOChannel *io, GError *err, gpointer user_data)
 
 static void disconnect_io(handle_t* h)
 {
-  if (h->conn_state == STATE_DISCONNECTED)
+  if (!h || h->conn_state == STATE_DISCONNECTED)
     return;
 
   g_attrib_unref(h->attrib);
@@ -312,7 +312,7 @@ static int get_localization_position_update(handle_t* h)
 }
 
 
-void *event_loop_thread(gpointer data) {
+static void *event_loop_thread(gpointer data) {
   handle_t* h = (handle_t*)data;
   h->event_loop = g_main_loop_new(NULL, FALSE);
   // put into extra thread
@@ -320,6 +320,11 @@ void *event_loop_thread(gpointer data) {
 }
 
 //----------- EXPORTED FUNCTIONS START
+
+int anki_s_is_connected(AnkiHandle ankihandle){
+  handle_t* h = (handle_t*)ankihandle;
+  return (h && h->conn_state == STATE_CONNECTED);
+}
 
 int anki_s_uturn(AnkiHandle ankihandle)
 {
@@ -441,10 +446,11 @@ void anki_s_close(AnkiHandle ankihandle){
   handle_t* h = (handle_t*)ankihandle;
   if (!h) return;
   disconnect(h);
-  g_usleep(50000);
+  g_usleep(1000000);
   g_main_loop_quit(h->event_loop);
+  g_usleep(50000);
   g_thread_join(h->g_thread);
-  g_thread_unref(h->g_thread);
   g_main_loop_unref(h->event_loop);
   free(h);
 }
+  

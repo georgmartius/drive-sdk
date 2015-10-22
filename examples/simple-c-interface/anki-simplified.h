@@ -52,7 +52,7 @@ int anki_s_set_speed(AnkiHandle handle, int speed, int accel);
 /** set let the car do a u-turn (direction of turning seems to be is autonomously decided)
     @return 0 for okay, 1 for failure
  */
-int anki_s_u_turn(AnkiHandle handle);
+int anki_s_uturn(AnkiHandle handle);
 /** set let the car change a lane
     @param relative_offset value in mm relative to current lane (polarity ?)
     @param h_speed value in mm/s. (default 100)
@@ -66,10 +66,12 @@ int anki_s_change_lane(AnkiHandle handle, int relative_offset, int h_speed, int 
  */
 int anki_s_cancel_lane_change(AnkiHandle handle);
 
+/** returns 1 if connected and 0 if not*/
+int anki_s_is_connected(AnkiHandle handle);
 
 /** returns the last self-localization of the car
     @return locatization struct
  */
-localization_t anki_s_get_localization();
+localization_t anki_s_get_localization(AnkiHandle handle);
 
 #endif

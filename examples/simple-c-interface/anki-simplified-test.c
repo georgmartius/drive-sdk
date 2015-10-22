@@ -39,16 +39,24 @@ int main(int argc, char *argv[])
   const char* car_id  = argv[2];
   int i;
   AnkiHandle h = anki_s_init(adapter, car_id, argc>3);
-  sleep(2);
+  sleep(1);
   if(anki_s_set_speed(h,1000,20000)!=0) return 1;
-  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  //for(i=0; i<10; i++){ usleep(200000); anki_s_change_lane(h,-40,100,1000); }  
+  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
   anki_s_set_speed(h,500,20000);
-  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
   anki_s_change_lane(h,-50,100,1000);
-  for(i=0; i<10; i++){ sleep(1);  print_loc(h);  }
+  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
   anki_s_set_speed(h,0,20000);
   sleep(1);
   anki_s_close(h);
-
+  sleep(2);
+  AnkiHandle h2 = anki_s_init(adapter, car_id, argc>3);  
+  usleep(500000);
+  if(anki_s_set_speed(h2,1000,20000)!=0) return 1;
+  for(i=0; i<5; i++){ usleep(200000);  print_loc(h);  }
+  anki_s_set_speed(h2,0,20000);
+  usleep(200000);
+  anki_s_close(h2);
   return 0;
 }
