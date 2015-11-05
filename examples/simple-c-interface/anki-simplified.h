@@ -31,6 +31,8 @@ typedef struct localization {
   int subsegm ;    ///< Lane and/or subpiece information? (between 0-255)
   int is_clockwise; ///< direction of driving (0: ccw, 1: cw)
   int update_time ; ///< Last update time (is increased every time we get an update from the car)
+  int num_uncounted_transitions ; ///< number of segment transitions where we did not get a localization yet
+  int is_delocalized ; ///< if 1 the car lost the track
 } localization_t;
 
 typedef void* AnkiHandle;

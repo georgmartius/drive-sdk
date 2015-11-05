@@ -39,24 +39,37 @@ int main(int argc, char *argv[])
   const char* car_id  = argv[2];
   int i;
   AnkiHandle h = anki_s_init(adapter, car_id, argc>3);
-  sleep(1);
+  if(!h) return 1;
+  printf("Setting initial speed 1000\n");
   if(anki_s_set_speed(h,1000,20000)!=0) return 1;
-  //for(i=0; i<10; i++){ usleep(200000); anki_s_change_lane(h,-40,100,1000); }  
-  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
+  for(i=0; i<10; i++){ usleep(200000); printf("changing lane -40\n"); anki_s_cancel_lane_change(h); anki_s_change_lane(h,-40,100,1000); print_loc(h); }
+  printf("Setting slow speed 500\n");
   anki_s_set_speed(h,500,20000);
-  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
+  for(i=0; i<5; i++){ usleep(100000); printf("changing lane +20\n");   anki_s_cancel_lane_change(h); anki_s_change_lane(h,20,200,4000);  print_loc(h); }
+  //for(i=0; i<20; i++){ usleep(200000);  anki_s_cancel_lane_change(h); anki_s_change_lane(h,-40,100,1000); }
+  for(i=0; i<10; i++){ usleep(1000000);  printf("testing locations\n"); print_loc(h);  }
+  printf("Uturn\n");
+  usleep(1000000);
+  printf("Stopping (smoothly)\n"); anki_s_set_speed(h,0,500);
+  for(i=0; i<14; i++){ usleep(1000000);  printf("speeding up to %d\n",i*100); anki_s_set_speed(h,i*100,10000);  print_loc(h); }
+  for(i=0; i<14; i++){ usleep(1000000);  printf("lowing down to %d\n",1400-i*100); anki_s_set_speed(h,1400-i*100,10000);  print_loc(h); }
+  printf("Uturn\n");
+  anki_s_uturn(h);
+  printf("Some more speed changes and lane changes\n");
+  anki_s_set_speed(h,1200,20000);
+  for(i=0; i<10; i++){ usleep(300000);  print_loc(h);  }
   anki_s_change_lane(h,-50,100,1000);
-  for(i=0; i<10; i++){ usleep(200000);  print_loc(h);  }
+  for(i=0; i<10; i++){ usleep(300000);  print_loc(h);  }
   anki_s_set_speed(h,0,20000);
   sleep(1);
   anki_s_close(h);
-  sleep(2);
-  AnkiHandle h2 = anki_s_init(adapter, car_id, argc>3);  
-  usleep(500000);
-  if(anki_s_set_speed(h2,1000,20000)!=0) return 1;
-  for(i=0; i<5; i++){ usleep(200000);  print_loc(h);  }
-  anki_s_set_speed(h2,0,20000);
-  usleep(200000);
-  anki_s_close(h2);
+  //sleep(5);
+  //AnkiHandle h2 = anki_s_init(adapter, car_id, argc>3);
+  //usleep(500000);
+  //if(anki_s_set_speed(h2,1000,20000)!=0) return 1;
+  //for(i=0; i<5; i++){ usleep(200000);  print_loc(h);  }
+  //anki_s_set_speed(h2,0,20000);
+  //usleep(200000);
+  //anki_s_close(h2);
   return 0;
 }
