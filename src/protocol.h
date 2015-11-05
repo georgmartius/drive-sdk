@@ -63,6 +63,9 @@ enum {
     // Light Patterns
     ANKI_VEHICLE_MSG_C2V_LIGHTS_PATTERN = 0x33,
 
+    // Vehicle Status reports
+    ANKI_VEHICLE_MSG_V2C_IS_READY = 0x86, // added by Georg, reverse engineering
+
     // SDK Mode
     ANKI_VEHICLE_MSG_C2V_SDK_MODE = 0x90,
 };
@@ -74,7 +77,7 @@ enum {
  *
  * - size: Size in bytes of the msg_id plus payload
  * - msg_id: Identifier for message
- * - payload: Optional message data for parameters or response info. 
+ * - payload: Optional message data for parameters or response info.
  *
  */
 typedef struct anki_vehicle_msg {
@@ -126,7 +129,7 @@ typedef struct anki_vehicle_msg_change_lane {
     uint8_t     size;
     uint8_t     msg_id;
     uint16_t    horizontal_speed_mm_per_sec;
-    uint16_t    horizontal_accel_mm_per_sec2; 
+    uint16_t    horizontal_accel_mm_per_sec2;
     float       offset_from_road_center_mm;
     uint8_t     hop_intent;
     uint8_t     tag;
@@ -177,7 +180,7 @@ typedef struct anki_vehicle_msg_set_lights {
     uint8_t msg_id;
     uint8_t light_mask;     // Valid and value bits for lights (see above)
 } ATTRIBUTE_PACKED anki_vehicle_msg_set_lights_t;
-#define ANKI_VEHICLE_MSG_C2V_SET_LIGHTS_SIZE 2 
+#define ANKI_VEHICLE_MSG_C2V_SET_LIGHTS_SIZE 2
 
 #define ANKI_VEHICLE_MAX_LIGHT_INTENSITY 14
 #define ANKI_VEHICLE_MAX_LIGHT_TIME 11
@@ -301,7 +304,7 @@ uint8_t anki_vehicle_msg_set_lights(anki_vehicle_msg_t *msg, uint8_t mask);
  *
  * @return size of bytes written to msg
  *
- * @see anki_vehicle_light_channel_t, anki_vehicle_light_effect_t 
+ * @see anki_vehicle_light_channel_t, anki_vehicle_light_effect_t
  */
 uint8_t anki_vehicle_msg_lights_pattern(anki_vehicle_msg_t *message, uint8_t channel, uint8_t effect, uint8_t start, uint8_t end, uint16_t cycles_per_min);
 

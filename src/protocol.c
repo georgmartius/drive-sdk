@@ -48,7 +48,7 @@ uint8_t anki_vehicle_msg_set_speed(anki_vehicle_msg_t *message, uint16_t speed_m
     msg->accel_mm_per_sec2 = accel_mm_per_sec2;
 
     return sizeof(anki_vehicle_msg_set_speed_t);
-} 
+}
 
 uint8_t anki_vehicle_msg_set_offset_from_road_center(anki_vehicle_msg_t *msg, float offset_mm)
 {
@@ -148,14 +148,6 @@ uint8_t anki_vehicle_msg_get_version(anki_vehicle_msg_t *msg)
     assert(msg != NULL);
     msg->size = ANKI_VEHICLE_MSG_BASE_SIZE;
     msg->msg_id = ANKI_VEHICLE_MSG_C2V_VERSION_REQUEST;
-    return ANKI_VEHICLE_MSG_TYPE_SIZE;
-}
-
-uint8_t anki_vehicle_msg_get_localization_position_update(anki_vehicle_msg_t *msg)
-{
-    assert(msg != NULL);
-    msg->size = ANKI_VEHICLE_MSG_BASE_SIZE;
-    msg->msg_id = ANKI_VEHICLE_MSG_V2C_LOCALIZATION_POSITION_UPDATE;
     return ANKI_VEHICLE_MSG_TYPE_SIZE;
 }
 
