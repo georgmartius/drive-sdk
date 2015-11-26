@@ -27,6 +27,8 @@ class Car:
         self.anki_uturn.restype = c_int
         self.anki_change_lane = self.anki_lib.anki_s_change_lane
         self.anki_change_lane.restype = c_int
+        self.anki_cancel_lane_change = self.anki_lib.anki_s_cancel_lane_change
+        self.anki_cancel_lane_change.restype = c_int
         self.anki_get_localization = self.anki_lib.anki_s_get_localization
         self.anki_get_localization.restype = location_data
         self.anki_is_connected = self.anki_lib.anki_s_is_connected
@@ -81,6 +83,9 @@ class Car:
             accel = 1000
         return  self.anki_change_lane(self.handle, offset, speed, accel)
 
+    def cancel_change_lane(self):
+        return  self.anki_cancel_lane_change(self.handle)
+
 
 if __name__ == "__main__":
 
@@ -108,7 +113,9 @@ if __name__ == "__main__":
     status = car.change_lane(100, 1500, 1000)
     sleep(2)
     status = car.change_lane(-100, 100, 1000)
-    sleep(5)
+    sleep(2)
+    car.cancel_change_lane()
+    sleep(1)
 
     if status:
         print "Couldn't set speed, code",  status
