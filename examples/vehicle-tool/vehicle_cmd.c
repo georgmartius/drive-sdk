@@ -171,6 +171,7 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
         case ANKI_VEHICLE_MSG_V2C_LOCALIZATION_POSITION_UPDATE:
         {
                     const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
+                    // rl_printf("[read] Test:  %i\n", msg->size);
                     rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\toffset %f\tclockwise %i\n", m->_reserved[0],m->_reserved[1], m->offset_from_road_center_mm, m->is_clockwise);
 
 
@@ -182,8 +183,13 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
                     rl_printf("[read] TRANS_UPDATE:  pieceID: %02x\toffset %f\tclockwise %i\n", m->_reserved, m->offset_from_road_center_mm, m->is_clockwise);
                     break;
         }
+        case 0x41:
+        {
+          rl_printf("[read] CURVE_END:  %i\t %02x\t%02x\t%02x\t%02x\n", msg->size, msg->msg_id, msg->payload[0], msg->payload[1], msg->payload[2]);
+          break;
+        }
         default:
-          //                    rl_printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
+          rl_printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
                     break;
         }
 }

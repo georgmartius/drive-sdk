@@ -42,9 +42,23 @@ int main(int argc, char *argv[])
   if(!h) return 1;
   printf("Setting initial speed 1000\n");
   if(anki_s_set_speed(h,1000,20000)!=0) return 1;
+
+  printf("TEST\n");
+
+  for(i=0; i<20; i++){ 
+    usleep(500000);  
+    anki_s_set_speed(h,0,2500);
+    usleep(500000);  
+    anki_s_set_speed(h,500,2500);
+    printf("%i\n",i+1);
+  }
+
   for(i=0; i<10; i++){ usleep(200000); printf("changing lane -40\n"); anki_s_cancel_lane_change(h); anki_s_change_lane(h,-40,100,1000); print_loc(h); }
   printf("Setting slow speed 500\n");
   anki_s_set_speed(h,500,20000);
+
+
+
   for(i=0; i<5; i++){ usleep(100000); printf("changing lane +20\n");   anki_s_cancel_lane_change(h); anki_s_change_lane(h,20,200,4000);  print_loc(h); }
   //for(i=0; i<20; i++){ usleep(200000);  anki_s_cancel_lane_change(h); anki_s_change_lane(h,-40,100,1000); }
   for(i=0; i<10; i++){ usleep(1000000);  printf("testing locations\n"); print_loc(h);  }
