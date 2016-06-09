@@ -33,6 +33,7 @@ typedef struct localization {
   int update_time ; ///< Last update time (is increased every time we get an update from the car)
   int num_uncounted_transitions ; ///< number of segment transitions where we did not get a localization yet
   int is_delocalized ; ///< if 1 the car lost the track
+  int finished_change_lane; ///< if 1 the car finished the last change lane
 } localization_t;
 
 typedef void* AnkiHandle;

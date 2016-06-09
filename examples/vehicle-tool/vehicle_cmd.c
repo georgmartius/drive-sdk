@@ -173,7 +173,9 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
         {
                     const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
                     // rl_printf("[read] Test:  %i\n", msg->size);
-                    rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\toffset %f\tclockwise %i\n", m->_reserved[0],m->_reserved[1], m->offset_from_road_center_mm, m->is_clockwise);
+                    rl_printf("[read] LOCALE_UPDATE: localisationID: %02x pieceID: %02x\toffset %f\tclockwise %i\n",
+                              m->location_id, m->road_piece_id, m->offset_from_road_center_mm,
+                              m->parsing_flags && PARSEFLAGS_MASK_REVERSE_DRIVING);
 
 
                     break;
@@ -181,16 +183,19 @@ static void handle_vehicle_msg_response(const uint8_t *data, uint16_t len)
         case ANKI_VEHICLE_MSG_V2C_LOCALIZATION_TRANSITION_UPDATE:
         {
                     const anki_vehicle_msg_localization_transition_update_t *m = (const anki_vehicle_msg_localization_transition_update_t *)msg;
-                    rl_printf("[read] TRANS_UPDATE:  pieceID: %02x\toffset %f\tclockwise %i\n", m->_reserved, m->offset_from_road_center_mm, m->is_clockwise);
+                    rl_printf("[read] TRANS_UPDATE:  pieceID: %02x\tpieceID-prev: %02x\toffset %f\tclockwise %i\n",
+                              m->road_piece_idx, m->road_piece_idx_prev, m->offset_from_road_center_mm, m->driving_direction);
                     break;
         }
-        case 0x41:
+        case ANKI_VEHICLE_MSG_V2C_CHANGE_LANE:
         {
-          rl_printf("[read] CURVE_END:  %i\t %02x\t%02x\t%02x\t%02x\n", msg->size, msg->msg_id, msg->payload[0], msg->payload[1], msg->payload[2]);
+          const anki_vehicle_msg_change_lane_update_t *m = (const anki_vehicle_msg_change_lane_update_t *)msg;
+          rl_printf("[read] Change-Lane:  %f\n", m->offset_from_road_center_mm);
+          //rl_printf("[read] Change-Lane:  %02x\t%02x\t%02x\t%02x\t%f\n", msg->payload[0], msg->payload[1], msg->payload[2],msg->payload[3],*f);
           break;
         }
         default:
-          rl_printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
+                    // rl_printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
                     break;
         }
 }
@@ -587,32 +592,6 @@ static void cmd_anki_vehicle_ping(int argcp, char **argvp)
         gatt_write_char(attrib, handle, value, plen, NULL, NULL);
 }
 
-static void cmd_anki_vehicle_uturn(int argcp, char **argvp)
-{
-        uint8_t *value;
-        size_t plen;
-        int handle;
-
-        if (conn_state != STATE_CONNECTED) {
-                failed("Disconnected\n");
-                return;
-        }
-
-        if (argcp < 1) {
-                rl_printf("Usage: %s\n", argvp[0]);
-                return;
-        }
-
-        handle = vehicle.write_char.value_handle;
-
-        anki_vehicle_msg_t msg;
-        plen = anki_vehicle_msg_turn_180(&msg);
-        // msg->msg_id=atoi(argvp[1]);
-        value = (uint8_t *)&msg;
-
-        gatt_write_char(attrib, handle, value, plen, NULL, NULL);
-}
-
 static void cmd_anki_vehicle_get_version(int argcp, char **argvp)
 {
         uint8_t *value;
@@ -701,34 +680,6 @@ static void cmd_anki_vehicle_change_lane(int argcp, char **argvp)
         size_t lane_plen = anki_vehicle_msg_change_lane(&lane_msg, hspeed, haccel, offset);
         gatt_write_char(attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
 }
-
-static void cmd_anki_vehicle_goto_lane(int argcp, char **argvp)
-{
-        if (conn_state != STATE_CONNECTED) {
-                failed("Disconnected\n");
-                return;
-        }
-
-        if (argcp < 3) {
-                rl_printf("Usage: %s <horizontal speed (mm/sec)> <horizontal accel (mm/sec^2)> <offset from center (mm)>\n", argvp[0]);
-                return;
-        }
-
-        int handle = vehicle.write_char.value_handle;
-
-        int16_t hspeed = (int16_t)atoi(argvp[1]);
-        int16_t haccel = (int16_t)atoi(argvp[2]);
-        float offset = 1.0;
-        if (argcp > 3) {
-            offset = strtof(argvp[3], NULL);
-        }
-        rl_printf("changing to lane %1.2f (speed = %d | accel = %d)\n", offset, hspeed, haccel);
-
-        anki_vehicle_msg_t lane_msg;
-        size_t lane_plen = anki_vehicle_msg_change_lane(&lane_msg, hspeed, haccel, offset);
-        gatt_write_char(attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
-}
-
 
 anki_vehicle_light_channel_t get_channel_by_name(const char *name)
 {
@@ -1007,17 +958,12 @@ static struct {
                 "Set SDK Mode"},
         { "ping",           cmd_anki_vehicle_ping,   "",
                 "Send ping message to vehicle."},
-	{ "get-version",           cmd_anki_vehicle_get_version,   "",
+        { "get-version",           cmd_anki_vehicle_get_version,   "",
                 "Request vehicle software version."},
         { "set-speed",          cmd_anki_vehicle_set_speed,  "<speed> <accel>",
                 "Set vehicle Speed (mm/sec) with acceleration (mm/sec^2)"},
         { "change-lane",          cmd_anki_vehicle_change_lane,  "<horizontal speed> <horizontal accel> <relative offset> (right(+), left(-))",
                 "Change lanes at speed (mm/sec), accel (mm/sec^2) in the specified direction (offset)"},
-        { "goto-lane",          cmd_anki_vehicle_goto_lane,  "<horizontal speed> <horizontal accel> <absolute offset> (right(+), 0: center/init, left(-))",
-                "Change to lane  given by offset at speed (mm/sec), accel (mm/sec^2)"
-                " (need change-lane before to set offset to 0). Only works for -78 -- +78mm"},
-        { "uturn",          cmd_anki_vehicle_uturn,  "",
-                "Perform U-turn"},
         { "set-lights-pattern",          cmd_anki_vehicle_lights_pattern,  "<channel> <effect> <start> <end> <cycles_per_min>",
                 "Set lights pattern for vehicle LEDs."},
         { "set-engine-lights",          cmd_anki_vehicle_engine_lights,  "<red> <green> <blue> <effect> <cycles_per_min>",

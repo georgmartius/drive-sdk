@@ -1,6 +1,7 @@
 #!/usr/bin/python
 from time import sleep
 from ctypes import cdll, Structure, c_int, c_void_p
+import sys
 
 class location_data(Structure):
     _fields_=[("segm", c_int),
@@ -8,7 +9,8 @@ class location_data(Structure):
               ("is_clockwise", c_int),
               ("update_time", c_int),
               ("num_uncounted_transitions", c_int),
-              ("is_delocalized", c_int),]
+              ("is_delocalized", c_int),
+              ("finished_change_lane", c_int),]
 
 class Car:
     status = 'disconnected'
@@ -73,6 +75,9 @@ class Car:
     def get_localization(self):
         return  self.anki_get_localization(self.handle)
 
+    def change_lane_finished(self):
+        return  self.anki_get_localization(self.handle).finished_change_lane;
+
     def uturn(self):
         return self.anki_uturn(self.handle)
 
@@ -104,33 +109,41 @@ if __name__ == "__main__":
         print "Couldn't connect, code", err
         raise SystemExit
 
-    status = car.set_speed(1200, 5000)
+    status = car.set_speed(1000, 5000)
     if status:
         print "Couldn't set speed, code",  status
         raise SystemExit
 
-    sleep(1)
+    # go to the right and the left continuously and wait until finised
+    for x in range(40):
+        offset= -80 if (x // 6) % 2 ==0 else 80
+        #car.cancel_change_lane()
+        status = car.change_lane(offset, 300, 1000)
+        sys.stdout.write("waiting")
+        while not car.change_lane_finished():
+            sleep(0.05)
+            sys.stdout.write(".")
+        sys.stdout.write("\n")
 
-    for i in range(0,10):
-	car.set_speed(500)
-	sleep(0.5)
-	car.set_speed(0)
-	sleep(0)
-	print i+1
-                
-    car.set_speed(500)
-    status = car.change_lane(100, 1500, 1000)
-    sleep(2)
-    status = car.change_lane(-100, 100, 1000)
-    sleep(2)
-    car.cancel_change_lane()
+    print "Stop car"
+    status = car.set_speed(0, 10000)
     sleep(1)
-
+    status = car.set_speed(1000, 10000)
+    sleep(1)
+    # speed up and slow down
+    for x in range(40):
+        status = car.set_speed((x % 6)*100+700, 1000)
+        sleep(0.1)
+    print "Stop car"
+    status = car.set_speed(0, 10000)
+    sleep(1)
+    status = car.set_speed(500, 10000)
+#    car.cancel_change_lane()
     if status:
         print "Couldn't set speed, code",  status
         raise SystemExit
 
-    for i in range(2):
+    for i in range(10):
         loc = car.get_localization()
         print "%02x %02x %d %d" % (loc.segm, loc.subsegm, loc.is_clockwise, loc.update_time)
         sleep(0.1)

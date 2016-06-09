@@ -252,6 +252,16 @@ typedef struct anki_vehicle_msg_offset_from_road_center_update {
 } ATTRIBUTE_PACKED anki_vehicle_msg_offset_from_road_center_update_t;
 #define ANKI_VEHICLE_MSG_V2C_OFFSET_FROM_ROAD_CENTER_UPDATE_SIZE  6
 
+// added by Georg (reverse engineered)
+typedef struct anki_vehicle_msg_change_lane_update {
+  uint8_t     size;
+  uint8_t     msg_id;
+  float       offset_from_road_center_mm;
+  uint8_t     unknown[9];
+} ATTRIBUTE_PACKED anki_vehicle_msg_change_lane_update_t;
+#define ANKI_VEHICLE_MSG_V2C_CHANGE_LANE_UPDATE_SIZE  14
+
+
 // Lights
 // The bits in the simple light message (ANKI_VEHICLE_MSG_C2V_SET_LIGHTS) corresponding to
 // each type of light.

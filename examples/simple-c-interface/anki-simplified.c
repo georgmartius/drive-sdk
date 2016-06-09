@@ -121,11 +121,11 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
     {
       const anki_vehicle_msg_localization_position_update_t *m = (const anki_vehicle_msg_localization_position_update_t *)msg;
 
-      // printf("LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->_reserved[0],m->_reserved[1]);
+      // printf("LOCALE_UPDATE: localisationID: %02x pieceID: %02x\n", m->road_piece_id,m->location_id);
       h->loc.update_time++;
-      h->loc.segm=m->_reserved[1];
-      h->loc.subsegm=m->_reserved[0];
-      h->loc.is_clockwise=m->is_clockwise;
+      h->loc.segm=m->road_piece_id;
+      h->loc.subsegm=m->location_id;
+      h->loc.is_clockwise=(m->parsing_flags && PARSEFLAGS_MASK_REVERSE_DRIVING)!=0; // m->is_clockwise;
       h->loc.num_uncounted_transitions=0;
       h->loc.is_delocalized=0;
       break;
@@ -133,8 +133,10 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
   case ANKI_VEHICLE_MSG_V2C_LOCALIZATION_TRANSITION_UPDATE:
     {
       const anki_vehicle_msg_localization_transition_update_t *m = (const anki_vehicle_msg_localization_transition_update_t *)msg;
+      h->loc.update_time++;
       h->loc.num_uncounted_transitions++;
       h->loc.is_delocalized=0;
+      h->loc.is_clockwise=m->driving_direction;
       break;
     }
   case ANKI_VEHICLE_MSG_V2C_IS_READY:
@@ -147,6 +149,15 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
     h->loc.subsegm=0;
     h->loc.is_delocalized=1;
     break;
+  case ANKI_VEHICLE_MSG_V2C_CHANGE_LANE:
+    {
+      const anki_vehicle_msg_change_lane_update_t *m = (const anki_vehicle_msg_change_lane_update_t *)msg;
+      // printf("CHANGE LANE UPDATE: %f\n",m->offset_from_road_center_mm);
+      if (m->offset_from_road_center_mm!=0)
+        h->loc.finished_change_lane = 1;
+      break;
+    }
+
   default:
     // printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
     break;
@@ -379,6 +390,8 @@ int anki_s_change_lane(AnkiHandle ankihandle, int relative_offset, int h_speed, 
   anki_vehicle_msg_t lane_msg;
   size_t lane_plen = anki_vehicle_msg_change_lane(&lane_msg, h_speed, h_accel, offset);
   gatt_write_char(h->attrib, handle, (uint8_t*)&lane_msg, lane_plen, NULL, NULL);
+
+  h->loc.finished_change_lane = 0;
   return 0;
 }
 
@@ -417,6 +430,7 @@ AnkiHandle anki_s_init(const char *src, const char *dst, int _verbose){
   h->loc.is_clockwise = 0;
   h->loc.update_time  = 0;
   h->loc.num_uncounted_transitions = 0;
+  h->loc.finished_change_lane = 1;
   h->conn_state       = STATE_DISCONNECTED;
   h->is_ready         = 0;
   if (dst == NULL) {
