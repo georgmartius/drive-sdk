@@ -82,6 +82,7 @@ typedef struct handle {
 
   anki_vehicle_t vehicle;
   localization_t loc;
+  uint16_t version;
 
   enum state {
     STATE_DISCONNECTED,
@@ -125,7 +126,13 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
       h->loc.update_time++;
       h->loc.segm=m->road_piece_id;
       h->loc.subsegm=m->location_id;
-      h->loc.is_clockwise=(m->parsing_flags && PARSEFLAGS_MASK_REVERSE_DRIVING)!=0; // m->is_clockwise;
+      if(h->version>0x2159){
+        h->loc.is_clockwise=(m->parsing_flags & PARSEFLAGS_MASK_REVERSE_PARSING)!=0;
+        // printf("Dir Loc cw: %i, cw2 %i, reverse %i, #bits %x\n",h->loc.is_clockwise,
+        // (m->parsing_flags&PARSEFLAGS_MASK_REVERSE_PARSING)!=0,
+        // (m->parsing_flags&PARSEFLAGS_MASK_REVERSE_DRIVING)!=0, m->parsing_flags&PARSEFLAGS_MASK_NUM_BITS);
+      }else
+        h->loc.is_clockwise=m->parsing_flags;
       h->loc.num_uncounted_transitions=0;
       h->loc.is_delocalized=0;
       break;
@@ -136,13 +143,26 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
       h->loc.update_time++;
       h->loc.num_uncounted_transitions++;
       h->loc.is_delocalized=0;
-      h->loc.is_clockwise=m->driving_direction;
+      //if(h->version>0x2159){ // this does not work: It is the wanted direction of driving that is changed with the uturn command but has nothing to do with the actual one.
+      //  h->loc.is_clockwise=m->driving_direction;
+      //  printf("Dir Trans: %i\n",m->driving_direction); }
+      // printf("TRANS: last %i, exec %i, speed %i, speed2 %i\n", m->last_recv_lane_change_id,m->last_exec_lane_change_id, m->last_desired_horizontal_speed_mm_per_sec, m->last_desired_speed_mm_per_sec);
       break;
     }
   case ANKI_VEHICLE_MSG_V2C_IS_READY:
     if(h->verbose) printf("Car READY\n");
     h->is_ready=1;
     break;
+  case ANKI_VEHICLE_MSG_V2C_VERSION_RESPONSE:
+    {
+      const anki_vehicle_msg_version_response_t *m = (const anki_vehicle_msg_version_response_t*)msg;
+      if(h->verbose) printf("Firmware Version: %x\n",m->version);
+      h->version=m->version;
+    }
+    break;
+  case ANKI_VEHICLE_MSG_V2C_PING_RESPONSE:
+    if(h->verbose) printf("Got Ping Ack\n");
+    h->loc.got_ping_ack=1;
   case ANKI_VEHICLE_MSG_V2C_VEHICLE_DELOCALIZED:
     h->loc.update_time++;
     h->loc.segm=0;
@@ -157,7 +177,6 @@ static void handle_vehicle_msg_response(handle_t* h, const uint8_t *data, uint16
         h->loc.finished_change_lane = 1;
       break;
     }
-
   default:
     // printf("Received unhandled vehicle message of type 0x%02x\n", msg->msg_id);
     break;
@@ -330,6 +349,17 @@ static int sdk_mode(handle_t* h,int mode)
   return 1;
 }
 
+static int get_version(handle_t* h)
+{
+  if (!check_connected(h))  return 0;
+
+  int handle = h->vehicle.write_char.value_handle;
+  anki_vehicle_msg_t msg;
+  size_t plen = anki_vehicle_msg_get_version(&msg);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  return 1;
+}
+
 
 static void *event_loop_thread(gpointer data) {
   handle_t* h = (handle_t*)data;
@@ -345,12 +375,28 @@ int anki_s_is_connected(AnkiHandle ankihandle){
   return (h && h->conn_state == STATE_CONNECTED);
 }
 
+int anki_s_ping(AnkiHandle ankihandle)
+{
+  handle_t* h = (handle_t*)ankihandle;
+
+  if (!check_connected(h))  return 1;
+
+  h->loc.got_ping_ack=0;
+  if(h->verbose) printf("ping\n");
+  int handle = h->vehicle.write_char.value_handle;
+  anki_vehicle_msg_t msg;
+  size_t plen = anki_vehicle_msg_ping(&msg);
+  gatt_write_char(h->attrib, handle, (uint8_t *)&msg, plen, NULL, NULL);
+  return 0;
+}
+
 int anki_s_uturn(AnkiHandle ankihandle)
 {
   handle_t* h = (handle_t*)ankihandle;
 
   if (!check_connected(h))  return 1;
 
+  if(h->verbose) printf("uturn\n");
   int handle = h->vehicle.write_char.value_handle;
   anki_vehicle_msg_t msg;
   size_t plen = anki_vehicle_msg_turn_180(&msg);
@@ -425,12 +471,15 @@ AnkiHandle anki_s_init(const char *src, const char *dst, int _verbose){
   h->iochannel        = NULL;
   h->attrib           = NULL;
   h->verbose          = _verbose;
+  h->version          = 0;
   h->loc.segm         = 0;
   h->loc.subsegm      = 0;
   h->loc.is_clockwise = 0;
   h->loc.update_time  = 0;
   h->loc.num_uncounted_transitions = 0;
   h->loc.finished_change_lane = 1;
+  h->loc.got_ping_ack = 1;
+
   h->conn_state       = STATE_DISCONNECTED;
   h->is_ready         = 0;
   if (dst == NULL) {
@@ -465,10 +514,10 @@ AnkiHandle anki_s_init(const char *src, const char *dst, int _verbose){
     error("could not connect to car\n");
     return NULL;
   }
-
   // set sdk mode
   sdk_mode(h,1);
-
+  // get firmware version
+  get_version(h);
   return h;
 }
 

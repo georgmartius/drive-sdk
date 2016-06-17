@@ -34,6 +34,7 @@ typedef struct localization {
   int num_uncounted_transitions ; ///< number of segment transitions where we did not get a localization yet
   int is_delocalized ; ///< if 1 the car lost the track
   int finished_change_lane; ///< if 1 the car finished the last change lane
+  int got_ping_ack; ///< if 0 we are waiting for a ping reponse
 } localization_t;
 
 typedef void* AnkiHandle;
